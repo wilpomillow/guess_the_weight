@@ -1,9 +1,5 @@
+import "server-only"
 import { MongoClient } from "mongodb"
-
-const uri = process.env.MONGODB_URI
-if (!uri) {
-  throw new Error("Missing MONGODB_URI in environment (.env.local).")
-}
 
 const dbName = process.env.MONGODB_DB || "guess_the_weight"
 
@@ -12,16 +8,26 @@ declare global {
   var __mongoClient: MongoClient | undefined
 }
 
+function getMongoUri(): string {
+  const uri = process.env.MONGODB_URI
+  if (!uri) {
+    throw new Error(
+      "Missing MONGODB_URI env var. Set it in .env.local and in Vercel Environment Variables."
+    )
+  }
+  return uri
+}
+
 export async function getDb() {
+  const uri = getMongoUri() // ✅ now typed as string
+
   if (!global.__mongoClient) {
     global.__mongoClient = new MongoClient(uri, {
       maxPoolSize: 10,
       serverSelectionTimeoutMS: 10_000
     })
   }
-  const client = global.__mongoClient
-  if (!client.topology?.isConnected()) {
-    await client.connect()
-  }
-  return client.db(dbName)
+
+  await global.__mongoClient.connect()
+  return global.__mongoClient.db(dbName)
 }
