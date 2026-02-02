@@ -1,0 +1,141 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* --------------------------------------------
+   THEME VARIABLES
+-------------------------------------------- */
+
+:root {
+  --bg-a: #ffffff;
+  --bg-b: #7c3aed; /* purple-600 */
+  --panel: rgba(255, 255, 255, 0.75);
+  --text: #1f2937;
+  --muted: rgba(31, 41, 55, 0.65);
+  --ring: rgba(124, 58, 237, 0.55);
+  --counter: #7c3aed;
+
+  /* UI controls (light mode) */
+  --btn-border: rgba(31, 41, 55, 0.28);
+  --btn-icon-bg: rgba(255, 255, 255, 0.82);
+  --btn-ghost-bg: rgba(124, 58, 237, 0.18);
+  --btn-primary-bg: rgba(124, 58, 237, 0.24);
+  --btn-primary-text: #4c1d95; /* purple-900 */
+}
+
+.dark {
+  --bg-a: #111827; /* slate-900 */
+  --bg-b: #7c3aed;
+  --panel: rgba(17, 24, 39, 0.7);
+  --text: rgba(255, 255, 255, 0.92);
+  --muted: rgba(255, 255, 255, 0.68);
+  --ring: rgba(167, 139, 250, 0.55);
+  --counter: rgba(255, 255, 255, 0.82);
+
+  /* UI controls (dark mode) */
+  --btn-border: rgba(255, 255, 255, 0.18);
+  --btn-icon-bg: rgba(255, 255, 255, 0.08);
+  --btn-ghost-bg: rgba(255, 255, 255, 0.08);
+  --btn-primary-bg: rgba(124, 58, 237, 0.22);
+  --btn-primary-text: rgba(255, 255, 255, 0.95);
+}
+
+/* --------------------------------------------
+   ROOT / BACKGROUND FIX (NO CLIPPING)
+-------------------------------------------- */
+
+html {
+  min-height: 100%;
+  background:
+    radial-gradient(1200px 800px at 20% 15%, rgba(124, 58, 237, 0.45), transparent 60%),
+    radial-gradient(1200px 800px at 80% 85%, rgba(124, 58, 237, 0.35), transparent 60%),
+    linear-gradient(135deg, var(--bg-a), var(--bg-b));
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
+/* --------------------------------------------
+   BODY / SCROLL BEHAVIOR
+-------------------------------------------- */
+
+body {
+  min-height: 100%;
+  color: var(--text);
+  background: transparent; /* background handled by html */
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Desktop: lock scroll (single viewport) */
+@media (min-width: 768px) {
+  body {
+    overflow-y: hidden;
+  }
+}
+
+/* --------------------------------------------
+   GLOBAL RESETS / POLISH
+-------------------------------------------- */
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+img,
+svg,
+video,
+canvas {
+  display: block;
+  max-width: 100%;
+}
+
+button {
+  touch-action: manipulation;
+}
+
+/* --------------------------------------------
+   GLASS / UI UTILITIES
+-------------------------------------------- */
+
+@layer components {
+  .glass {
+    background: var(--panel);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+
+  .btnIcon {
+    @apply rounded-xl border border-white/15 bg-white/5 hover:bg-white/10 transition;
+    border-color: var(--btn-border);
+    background: var(--btn-icon-bg);
+  }
+
+  .btnPrimary {
+    @apply inline-flex items-center justify-center rounded-xl border px-4 py-3 text-base font-extrabold tracking-wide transition active:scale-[0.98];
+    border-color: var(--btn-border);
+    background: var(--btn-primary-bg);
+    color: var(--btn-primary-text);
+  }
+
+  .btnGhost {
+    @apply inline-flex items-center justify-center rounded-xl border px-4 py-3 text-base font-extrabold tracking-wide transition active:scale-[0.98];
+    border-color: var(--btn-border);
+    background: var(--btn-ghost-bg);
+  }
+}
+
+/* --------------------------------------------
+   SAFETY FOR FULL-VIEWPORT LAYOUTS
+-------------------------------------------- */
+
+#__next {
+  min-height: 100%;
+}
+
+.font-sour-gummy {
+  font-family: var(--font-sour-gummy);
+  font-weight: 400;
+}
