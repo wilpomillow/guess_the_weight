@@ -391,7 +391,7 @@ function ActualWeightPanel({
 
         {submitError && (
           <div className="mt-2 text-xs" style={{ color: "var(--muted)" }}>
-            Couldn’t log your guess right now — showing results anyway.
+            Couldn’t log your guess right now: {submitError}
           </div>
         )}
 

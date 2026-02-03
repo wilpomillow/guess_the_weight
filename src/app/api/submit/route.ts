@@ -1,3 +1,5 @@
+export const runtime = "nodejs"
+
 import { NextResponse } from "next/server"
 import { getDb } from "@/lib/mongo"
 
@@ -9,6 +11,7 @@ type Body = {
 const MIN_KG = 0.5
 const MAX_KG = 1000
 const BUCKET_KG = 50
+const KEEP_N = 100
 
 type Bucket = { startKg: number; endKg: number; count: number }
 
@@ -39,6 +42,7 @@ function buildHistogram(guesses: number[]): Bucket[] {
     const idx = Math.min(buckets.length - 1, Math.max(0, Math.floor(g / BUCKET_KG)))
     buckets[idx].count += 1
   }
+
   return buckets
 }
 
@@ -65,53 +69,79 @@ function stats(guesses: number[], userGuessKg: number): StatSummary {
   }
 }
 
-export async function POST(req: Request) {
-  const body = (await req.json()) as Partial<Body>
-  const itemID = String(body.itemID || "").trim()
-  const guessKgRaw = Number(body.guessKg)
-
-  if (!itemID || !Number.isFinite(guessKgRaw)) {
-    return NextResponse.json({ error: "Invalid submission." }, { status: 400 })
-  }
-
-  const guessKg = round2(clamp(guessKgRaw, MIN_KG, MAX_KG))
-
-  const db = await getDb()
-  const col = db.collection("submissions")
-
-  await col.createIndex({ itemID: 1, createdAt: -1 })
-
-  // Insert the new guess
-  await col.insertOne({ itemID, guessKg, createdAt: new Date() })
-
-  // FIFO cap: keep newest 100 guesses for this itemID
-  const count = await col.countDocuments({ itemID })
-  if (count > 100) {
-    const excess = count - 100
-    const oldest = await col
-      .find({ itemID }, { projection: { _id: 1 } })
-      .sort({ createdAt: 1 })
-      .limit(excess)
-      .toArray()
-
-    const ids = oldest.map((d) => d._id)
-    if (ids.length) await col.deleteMany({ _id: { $in: ids } })
-  }
-
-  const recent = await col
-    .find({ itemID }, { projection: { _id: 0, guessKg: 1, createdAt: 1 } })
+/**
+ * Trims collection for an itemID to newest KEEP_N documents.
+ * Efficient FIFO: find cutoff doc (KEEP_N-th newest) then delete older than it.
+ */
+async function trimToLastN(col: any, itemID: string, n: number) {
+  const cutoff = await col
+    .find({ itemID }, { projection: { createdAt: 1 } })
     .sort({ createdAt: -1 })
-    .limit(100)
+    .skip(n)
+    .limit(1)
     .toArray()
 
-  const guesses = recent.map((r: any) => Number(r.guessKg)).filter(Number.isFinite)
-  const histogram = buildHistogram(guesses)
-  const summary = stats(guesses, guessKg)
+  if (!cutoff?.length) return
 
-  return NextResponse.json({
-    ok: true,
-    recent,
-    histogram: { bucketKg: BUCKET_KG, buckets: histogram },
-    stats: summary
-  })
+  const cutoffDate = cutoff[0].createdAt as Date
+  await col.deleteMany({ itemID, createdAt: { $lt: cutoffDate } })
+}
+
+export async function POST(req: Request) {
+  try {
+    const body = (await req.json()) as Partial<Body>
+    const itemID = String(body.itemID || "").trim()
+    const guessKgRaw = Number(body.guessKg)
+
+    if (!itemID || !Number.isFinite(guessKgRaw)) {
+      return NextResponse.json({ ok: false, error: "Invalid submission." }, { status: 400 })
+    }
+
+    const guessKg = round2(clamp(guessKgRaw, MIN_KG, MAX_KG))
+
+    const db = await getDb()
+    const collectionName = process.env.MONGODB_COLLECTION || "submissions"
+    const col = db.collection(collectionName)
+
+    // ✅ DO NOT create indexes per request (slow + can lock).
+    // Create these once manually in MongoDB/Atlas:
+    // db.submissions.createIndex({ itemID: 1, createdAt: -1 })
+
+    // Insert the new guess
+    await col.insertOne({
+      itemID,
+      guessKg,
+      createdAt: new Date()
+    })
+
+    // FIFO cap: keep newest 100 guesses for this itemID
+    await trimToLastN(col, itemID, KEEP_N)
+
+    // Read back newest 100
+    const recent = await col
+      .find({ itemID }, { projection: { _id: 0, guessKg: 1, createdAt: 1 } })
+      .sort({ createdAt: -1 })
+      .limit(KEEP_N)
+      .toArray()
+
+    const guesses = recent.map((r: any) => Number(r.guessKg)).filter(Number.isFinite)
+    const histogram = buildHistogram(guesses)
+    const summary = stats(guesses, guessKg)
+
+    return NextResponse.json({
+      ok: true,
+      recent,
+      histogram: { bucketKg: BUCKET_KG, buckets: histogram },
+      stats: summary
+    })
+  } catch (err: any) {
+    console.error("SUBMIT ERROR:", err)
+    return NextResponse.json(
+      {
+        ok: false,
+        error: err?.message || "Unknown server error"
+      },
+      { status: 500 }
+    )
+  }
 }
